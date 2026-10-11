@@ -1,0 +1,11 @@
+{
+  "name": "VoyagerAI — AI Travel Planner",
+  "short_name": "VoyagerAI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F6F2EA",
+  "theme_color": "#12141F",
+  "icons": [
+    { "src": "/logo-icon.png", "sizes": "156x156", "type": "image/png", "purpose": "any" }
+  ]
+}

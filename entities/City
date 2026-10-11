@@ -1,0 +1,83 @@
+{
+  "name": "City",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "City name"
+    },
+    "country": {
+      "type": "string",
+      "description": "Country name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the city"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Hero image URL"
+    },
+    "avg_daily_budget": {
+      "type": "number",
+      "description": "Average daily budget in USD"
+    },
+    "best_seasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Best months to visit"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags like culture, food, nature, adventure"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "timezone": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string"
+    },
+    "attractions_highlights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "price_level": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "transport_info": {
+      "type": "string",
+      "description": "Transport guide for the city"
+    },
+    "food_highlights": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "name",
+    "country"
+  ]
+}

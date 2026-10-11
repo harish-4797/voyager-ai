@@ -1,0 +1,170 @@
+{
+  "name": "Trip",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Trip title"
+    },
+    "city": {
+      "type": "string",
+      "description": "Destination city"
+    },
+    "country": {
+      "type": "string"
+    },
+    "days": {
+      "type": "number",
+      "description": "Number of days"
+    },
+    "budget": {
+      "type": "number",
+      "description": "Total budget in USD"
+    },
+    "month": {
+      "type": "string",
+      "description": "Travel month"
+    },
+    "interests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User interests"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "confirmed",
+        "completed",
+        "cancelled"
+      ],
+      "default": "planning"
+    },
+    "itinerary": {
+      "type": "object",
+      "description": "Full structured itinerary JSON from AI",
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "estimated_budget": {
+          "type": "object",
+          "properties": {
+            "hotels": {
+              "type": "number"
+            },
+            "food": {
+              "type": "number"
+            },
+            "transport": {
+              "type": "number"
+            },
+            "attractions": {
+              "type": "number"
+            },
+            "misc": {
+              "type": "number"
+            },
+            "total": {
+              "type": "number"
+            }
+          }
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "number"
+              },
+              "theme": {
+                "type": "string"
+              },
+              "morning": {
+                "type": "object",
+                "properties": {
+                  "activity": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "estimated_cost": {
+                    "type": "number"
+                  },
+                  "duration": {
+                    "type": "string"
+                  },
+                  "tips": {
+                    "type": "string"
+                  }
+                }
+              },
+              "afternoon": {
+                "type": "object",
+                "properties": {
+                  "activity": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "estimated_cost": {
+                    "type": "number"
+                  },
+                  "duration": {
+                    "type": "string"
+                  },
+                  "tips": {
+                    "type": "string"
+                  }
+                }
+              },
+              "evening": {
+                "type": "object",
+                "properties": {
+                  "activity": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "estimated_cost": {
+                    "type": "number"
+                  },
+                  "duration": {
+                    "type": "string"
+                  },
+                  "tips": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "image_url": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "city",
+    "days",
+    "budget"
+  ]
+}

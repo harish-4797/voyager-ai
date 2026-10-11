@@ -1,0 +1,214 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand palette (raw HSL so Tailwind can apply opacity) */
+    --ink: 228 24% 9%;
+    --cream: 38 38% 95%;
+    --sunset: 16 100% 57%;
+    --coral: 348 88% 61%;
+    --sun: 38 100% 58%;
+    --ocean: 188 80% 36%;
+
+    --background: 38 38% 95%;
+    --foreground: 228 24% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 228 24% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 228 24% 9%;
+    --primary: 228 24% 9%;
+    --primary-foreground: 38 38% 97%;
+    --secondary: 36 26% 90%;
+    --secondary-foreground: 228 24% 9%;
+    --muted: 36 26% 91%;
+    --muted-foreground: 228 8% 42%;
+    --accent: 30 60% 93%;
+    --accent-foreground: 228 24% 9%;
+    --destructive: 0 80% 58%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 34 20% 86%;
+    --input: 34 20% 84%;
+    --ring: 16 100% 57%;
+    --chart-1: 16 100% 57%;
+    --chart-2: 188 80% 36%;
+    --chart-3: 38 100% 58%;
+    --chart-4: 348 88% 61%;
+    --chart-5: 228 24% 30%;
+    --radius: 1rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 16 100% 57%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased font-sans;
+    font-feature-settings: "ss01", "cv11";
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+
+  ::selection {
+    background: hsl(var(--sunset) / 0.25);
+    color: hsl(var(--ink));
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--sunset));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Frosted card used across the app */
+  .surface {
+    @apply rounded-3xl border border-ink/[0.06] bg-white/80 shadow-soft backdrop-blur-xl;
+  }
+
+  .glass-dark {
+    @apply border border-white/15 bg-white/10 backdrop-blur-xl;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-sunset;
+  }
+
+  .text-gradient-sunset {
+    @apply bg-gradient-to-r from-sun via-sunset to-coral bg-clip-text text-transparent;
+  }
+
+  .bg-gradient-sunset {
+    @apply bg-gradient-to-r from-sunset to-coral;
+  }
+
+  .btn-sunset {
+    @apply bg-gradient-to-r from-sunset to-coral text-white shadow-glow transition-all duration-300 hover:brightness-110 hover:shadow-[0_14px_44px_-10px_hsl(var(--sunset)/0.7)];
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-white/70 px-3 py-1 text-xs font-medium text-ink/70 backdrop-blur;
+  }
+
+  .text-outline {
+    color: transparent;
+    -webkit-text-stroke: 1px currentColor;
+  }
+
+  /* Cursor-following spotlight; set --mx / --my from JS */
+  .spotlight {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), hsl(var(--sunset) / 0.12), transparent 45%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .spotlight:hover::before {
+    opacity: 1;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--background)) 37%, hsl(var(--muted)) 63%);
+    background-size: 400% 100%;
+    @apply animate-shimmer;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mask-fade-x {
+    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  }
+
+  .pause-on-hover:hover {
+    animation-play-state: paused;
+  }
+
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+}
+
+/* Film-grain overlay for a tactile, editorial feel */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Warm, slightly muted map tiles to sit with the cream palette */
+.voyager-map .leaflet-tile-pane {
+  filter: saturate(0.75) sepia(0.12) brightness(1.02);
+}
+
+.voyager-map .leaflet-control-zoom a {
+  border-radius: 10px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--ink) / 0.18);
+  border-radius: 999px;
+  border: 2px solid hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--sunset) / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
