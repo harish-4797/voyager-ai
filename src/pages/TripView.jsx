@@ -3,7 +3,8 @@ import { voyager } from "@/api/voyagerClient";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
-  ArrowLeft, Calendar, CalendarDays, MapPin, Wallet, Tag, Download, Loader2, Sparkles, MessageCircle, Luggage, ArrowLeftRight, CloudRain
+  ArrowLeft, Calendar, CalendarDays, MapPin, Wallet, Tag, Download, Loader2, Sparkles, MessageCircle, Luggage, ArrowLeftRight, CloudRain,
+  Database, BadgeCheck, CloudSun, BookOpen, ExternalLink
 } from "lucide-react";
 import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
 import DayCard from "@/components/trip/DayCard";
@@ -26,16 +27,27 @@ const STATUS_COLORS = {
   cancelled: "bg-white/80 text-ink/60",
 };
 
+const STAGE_LABELS = {
+  retrieve: "Retrieving places…",
+  rank: "Ranking places…",
+  enrich: "Reading Wikipedia…",
+  weather: "Checking weather…",
+  generate: "Writing plan…",
+  ground: "Verifying stops…",
+};
+
 function RegenerateButton({ trip, onDone }) {
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState(null);
   const [error, setError] = useState(null);
 
   const regenerate = async () => {
     setLoading(true);
+    setStage(null);
     setError(null);
 
     try {
-      const result = await generateItinerary(trip);
+      const result = await generateItinerary({ ...trip, onStage: (key) => setStage(key) });
       const updated = await voyager.entities.Trip.update(trip.id, { itinerary: result });
       onDone(updated);
       setLoading(false);
@@ -54,11 +66,82 @@ function RegenerateButton({ trip, onDone }) {
         disabled={loading}
         className="btn-sunset flex h-11 items-center gap-2 rounded-full px-5 text-xs font-semibold disabled:opacity-60 sm:text-sm"
       >
-        {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Regenerating...</> : <><Sparkles className="h-4 w-4" />Regenerate in ₹</>}
+        {loading ? <><Loader2 className="h-4 w-4 animate-spin" />{STAGE_LABELS[stage] || "Regenerating…"}</> : <><Sparkles className="h-4 w-4" />Regenerate</>}
       </motion.button>
       {error && (
         <p className="mt-3 text-sm text-red-400">{error}</p>
       )}
+    </div>
+  );
+}
+
+/** Shows how the itinerary was grounded: retrieval stats plus the real sources behind each stop. */
+function RagProvenance({ rag }) {
+  const [open, setOpen] = useState(false);
+  if (!rag?.used) {
+    return (
+      <p className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+        <Database className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        {rag
+          ? "Generated without retrieval (place sources were unavailable). Regenerate to ground this plan in real places."
+          : "Created before real-place retrieval was added. Use Regenerate to ground it in real places."}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-5 rounded-2xl border border-ocean/20 bg-ocean/5 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1.5 rounded-full bg-ocean px-3 py-1 text-xs font-semibold text-white">
+          <Database className="h-3.5 w-3.5" /> RAG-grounded
+        </span>
+        <span className="chip">
+          <MapPin className="h-3 w-3 text-ocean" /> {rag.retrieved} real places retrieved
+        </span>
+        <span className="chip">
+          <BadgeCheck className="h-3 w-3 text-ocean" /> {rag.grounded}/{rag.total} stops verified
+        </span>
+        {rag.weather && (
+          <span className="chip">
+            <CloudSun className="h-3 w-3 text-ocean" /> {rag.weather === "forecast" ? "Live forecast" : "Typical weather"} used
+          </span>
+        )}
+        {rag.sources?.length > 0 && (
+          <button onClick={() => setOpen((o) => !o)} className="ml-auto text-xs font-semibold text-ocean hover:underline">
+            {open ? "Hide sources" : `View ${rag.sources.length} sources`}
+          </button>
+        )}
+      </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.ul
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="mt-3 grid gap-1.5 overflow-hidden sm:grid-cols-2"
+          >
+            {rag.sources.map((src) => (
+              <li key={src.id} className="flex items-center justify-between gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs">
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold text-ink">{src.name}</span>
+                  <span className="text-muted-foreground">{src.type}</span>
+                </span>
+                <span className="flex shrink-0 gap-1">
+                  {src.wikipedia_url && (
+                    <a href={src.wikipedia_url} target="_blank" rel="noreferrer" title="Wikipedia" className="rounded-full p-1.5 text-ink/60 hover:bg-ink/5 hover:text-ink">
+                      <BookOpen className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                  {src.osm_url && (
+                    <a href={src.osm_url} target="_blank" rel="noreferrer" title="OpenStreetMap" className="rounded-full p-1.5 text-ink/60 hover:bg-ink/5 hover:text-ink">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                </span>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -381,6 +464,7 @@ export default function TripView() {
                     ))}
                   </div>
                 )}
+                <RagProvenance rag={itinerary.rag} />
               </div>
             </div>
           </Reveal>

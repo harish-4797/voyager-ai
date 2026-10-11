@@ -9,7 +9,8 @@ const CACHE_KEY = "voyager_geocode_cache";
 const MIN_INTERVAL_MS = 1100;
 const DEFAULT_RADIUS_KM = 60;
 
-let queue = Promise.resolve();
+// One serial chain for every Nominatim call in the app (map lookups and RAG retrieval).
+let chain = Promise.resolve();
 let lastRequest = 0;
 
 function readCache() {
@@ -51,15 +52,28 @@ export function isNearCity(point, cityName) {
   return area ? distanceKm(area, point) <= area.radiusKm : true;
 }
 
+/**
+ * Throttled Nominatim search shared across the app (≤ 1 request/second, serialised).
+ * `params` is a query string without format/limit, e.g. "q=beach&viewbox=...".
+ */
+export function nominatimSearch(params, limit = 1) {
+  const run = async () => {
+    const wait = Math.max(0, lastRequest + MIN_INTERVAL_MS - Date.now());
+    if (wait) await new Promise((r) => setTimeout(r, wait));
+    lastRequest = Date.now();
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=${limit}&${params}`, {
+      headers: { "Accept-Language": "en" },
+    });
+    if (!res.ok) throw new Error(`Nominatim failed (${res.status})`);
+    return res.json();
+  };
+  const result = chain.then(run, run);
+  chain = result.catch(() => null);
+  return result;
+}
+
 async function nominatim(params) {
-  const wait = Math.max(0, lastRequest + MIN_INTERVAL_MS - Date.now());
-  if (wait) await new Promise((r) => setTimeout(r, wait));
-  lastRequest = Date.now();
-  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&${params}`, {
-    headers: { "Accept-Language": "en" },
-  });
-  if (!res.ok) throw new Error(`Geocoding failed (${res.status})`);
-  const [hit] = await res.json();
+  const [hit] = await nominatimSearch(params, 1);
   return hit ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
 }
 
@@ -70,9 +84,7 @@ export function geocodePlace(location, cityName) {
   if (key in cache) return Promise.resolve(cache[key]);
 
   const area = cityArea(cityName);
-  const run = async () => {
-    const again = readCache();
-    if (key in again) return again[key];
+  return (async () => {
     let params = `q=${encodeURIComponent(`${location}, ${cityName}`)}&countrycodes=in`;
     if (area) {
       const d = area.radiusKm / 111;
@@ -84,9 +96,5 @@ export function geocodePlace(location, cityName) {
     const value = point && isNearCity(point, cityName) ? point : null;
     writeCache(key, value);
     return value;
-  };
-
-  const result = queue.then(run, run);
-  queue = result.catch(() => null);
-  return result;
+  })();
 }

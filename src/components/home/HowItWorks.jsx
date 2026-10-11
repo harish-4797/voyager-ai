@@ -12,8 +12,8 @@ const STEPS = [
   },
   {
     icon: Brain,
-    title: "AI crafts your plan",
-    description: "Our engine retrieves real data and generates a hyper-personalised itinerary in seconds.",
+    title: "Real places + AI",
+    description: "We retrieve real places from Wikipedia and OpenStreetMap plus the weather, then the AI builds your plan only from them.",
     color: "from-sunset to-coral",
   },
   {

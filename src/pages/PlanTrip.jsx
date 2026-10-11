@@ -30,6 +30,7 @@ export default function PlanTrip() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [surpriseOpen, setSurpriseOpen] = useState(false);
+  const [genStage, setGenStage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
@@ -59,9 +60,10 @@ export default function PlanTrip() {
   const generateItinerary = async () => {
     setLoading(true);
     setError(null);
+    setGenStage(null);
 
     try {
-      const result = await requestItinerary(form);
+      const result = await requestItinerary({ ...form, onStage: (key, info) => setGenStage({ key, info }) });
 
       const trip = await voyager.entities.Trip.create({
         title: `${form.days}-Day ${form.city} Adventure`,
@@ -118,7 +120,7 @@ export default function PlanTrip() {
 
   return (
     <div className="min-h-screen px-4 pb-20 sm:px-6">
-      <AnimatePresence>{loading && <GeneratingOverlay form={form} />}</AnimatePresence>
+      <AnimatePresence>{loading && <GeneratingOverlay form={form} stage={genStage} />}</AnimatePresence>
       <SurpriseMe open={surpriseOpen} onOpenChange={setSurpriseOpen} initial={form} onAccept={acceptSurprise} />
 
       <div className="mx-auto max-w-5xl">
@@ -410,20 +412,19 @@ const STEP_COPY = [
   { title: "What do you love?", subtitle: "Choose at least one — the more you pick, the more personal it gets." },
 ];
 
-function GeneratingOverlay({ form }) {
-  const messages = [
-    `Scouting hidden gems in ${form.city}…`,
-    `Checking ${form.month} weather & festivals…`,
-    `Balancing your ₹${form.budget.toLocaleString("en-IN")} budget…`,
-    "Clustering activities by neighbourhood…",
-    "Adding insider tips from locals…",
-  ];
-  const [index, setIndex] = useState(0);
+// Real RAG pipeline stages, reported by generateItinerary's onStage callback.
+const PIPELINE = [
+  { key: "retrieve", short: "Retrieve", text: (f) => `Retrieving real places in ${f.city} from Wikipedia & OpenStreetMap…` },
+  { key: "rank", short: "Rank", text: (f, i) => `Ranking ${i?.count ?? ""} places for ${f.interests.slice(0, 2).join(" & ") || "you"}…` },
+  { key: "enrich", short: "Enrich", text: () => "Reading Wikipedia notes on the top picks…" },
+  { key: "weather", short: "Weather", text: (f) => `Checking ${f.month} weather for your dates…` },
+  { key: "generate", short: "Generate", text: () => "Writing your day-by-day plan with AI…" },
+  { key: "ground", short: "Verify", text: () => "Verifying every stop against real places…" },
+];
 
-  useEffect(() => {
-    const id = setInterval(() => setIndex((i) => Math.min(i + 1, messages.length - 1)), 2600);
-    return () => clearInterval(id);
-  }, [messages.length]);
+function GeneratingOverlay({ form, stage }) {
+  const index = Math.max(0, PIPELINE.findIndex((p) => p.key === stage?.key));
+  const current = PIPELINE[index];
 
   return (
     <motion.div
@@ -470,7 +471,7 @@ function GeneratingOverlay({ form }) {
         </div>
       </div>
 
-      <p className="relative mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-sunset">Crafting your itinerary</p>
+      <p className="relative mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-sunset">RAG pipeline · step {index + 1} of {PIPELINE.length}</p>
       <div className="relative h-10 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.p
@@ -481,22 +482,26 @@ function GeneratingOverlay({ form }) {
             transition={{ duration: 0.5, ease: EASE }}
             className="font-display text-2xl font-semibold text-white sm:text-3xl"
           >
-            {messages[index]}
+            {current.text(form, stage?.info)}
           </motion.p>
         </AnimatePresence>
       </div>
       <div className="relative mt-8 flex gap-2">
-        {messages.map((_, i) => (
-          <motion.span
-            key={i}
-            className="h-1.5 rounded-full"
-            initial={false}
-            animate={{ width: i === index ? 32 : 8, backgroundColor: i <= index ? "#FF6A2B" : "rgba(255,255,255,0.2)" }}
-            transition={{ duration: 0.5 }}
-          />
+        {PIPELINE.map((step, i) => (
+          <div key={step.key} className="flex flex-col items-center gap-2">
+            <motion.span
+              className="h-1.5 rounded-full"
+              initial={false}
+              animate={{ width: i === index ? 40 : 18, backgroundColor: i <= index ? "#FF6A2B" : "rgba(255,255,255,0.2)" }}
+              transition={{ duration: 0.5 }}
+            />
+            <span className={`text-[10px] font-semibold uppercase tracking-widest ${i <= index ? "text-white/80" : "text-white/30"}`}>
+              {step.short}
+            </span>
+          </div>
         ))}
       </div>
-      <p className="relative mt-10 text-sm text-white/40">This usually takes 10–30 seconds</p>
+      <p className="relative mt-10 text-sm text-white/40">This usually takes 15–40 seconds</p>
     </motion.div>
   );
 }

@@ -44,6 +44,8 @@ export const CITIES = [
     lat: 15.35,
     lng: 73.95,
     radiusKm: 90,
+    // Search anchors for retrieval (the area is too large for a single 10 km search).
+    anchors: [[15.555, 73.755], [15.6, 73.74], [15.497, 73.827], [15.5, 73.912], [15.27, 73.92], [15.01, 74.02], [15.315, 74.314]],
     description: "Sun-soaked beaches, Portuguese heritage, and a laid-back vibe on India's western coast.",
     img: "https://titosgoa.com/api/uploads/1768282500728-why-tourists-visit-goa.png",
     tags: ["Beach", "Nightlife", "Nature"],
@@ -96,6 +98,8 @@ export const CITIES = [
     lat: 34.1526,
     lng: 77.5771,
     radiusKm: 250,
+    // Search anchors for retrieval (the area is too large for a single 10 km search).
+    anchors: [[34.152, 77.577], [33.91, 77.7], [34.2, 77.17], [34.55, 77.56], [33.76, 78.67]],
     description: "High-altitude desert city in Ladakh surrounded by snow-capped Himalayan peaks.",
     img: "https://assets.cntraveller.in/photos/60ba09c482b06272bc86ba08/master/pass/lehguidelead.jpg",
     tags: ["Mountains", "Adventure", "Buddhist"],

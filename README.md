@@ -4,6 +4,7 @@ An AI-powered travel planner built with React + Vite. Tell it where, when and wh
 
 ## Features
 
+- 🔎 **RAG-grounded itineraries** — the AI plans only from real places retrieved from Wikipedia and OpenStreetMap, and every stop is verified with source links
 - 🤖 **AI itineraries** — morning, afternoon and evening plans with costs, durations and local tips (via Groq)
 - 🗺️ **Day maps** — every day's stops pinned on a map with a route line and one-tap Google Maps directions
 - 🔀 **Edit, don't regenerate** — swap a single activity ("cheaper", "indoor", or your own request) with undo, drag activities between days, and add personal notes
@@ -40,6 +41,26 @@ An AI-powered travel planner built with React + Vite. Tell it where, when and wh
    ```
    Then open `http://localhost:5173`.
 
+## RAG pipeline
+
+Itineraries are generated with retrieval-augmented generation rather than from the model's memory alone:
+
+```
+ Retrieve ──► Rank ──► Enrich ──► Weather ──► Generate ──► Ground
+ Wikipedia    BM25 +    Wikipedia   Open-Meteo   Groq LLM     match each stop to a
+ geosearch +  notability summaries  forecast /   (cites       retrieved place → real
+ Nominatim    + interest            typical      place ids)   coords + source links
+ (OSM)        quotas
+```
+
+1. **Retrieve** ([`src/lib/rag/places.js`](src/lib/rag/places.js)) — real places around the city: notable attractions via Wikipedia geosearch (with their descriptions) and everyday places (restaurants, cafés, bars, beaches, markets…) via OpenStreetMap Nominatim. Cached for 7 days.
+2. **Rank** ([`src/lib/rag/ranking.js`](src/lib/rag/ranking.js)) — Okapi BM25 against the traveller's interests (with query expansion), plus notability, time-of-day fit, proximity (for swaps) and an avoid-list penalty; a diversity step gives each interest a fair share of the top 40.
+3. **Enrich** — short Wikipedia summaries for the top attractions; **weather** for the trip dates.
+4. **Generate** — the prompt lists the places as `[P1] … [P40]`; the model must build every activity from one of them and cite its id.
+5. **Ground** ([`src/lib/rag/grounding.js`](src/lib/rag/grounding.js)) — each activity is matched back to a retrieved place (by citation, then by name); verified stops get real coordinates and Wikipedia/OSM links, unmatched ones are labelled "unverified". Stats are stored as `itinerary.rag` and shown in the trip's Sources panel.
+
+Single-activity swaps use the same pipeline, re-ranked for the request ("cheaper", "food"…) and the day's location. If retrieval sources are unavailable, generation falls back to the plain LLM prompt and the trip is labelled accordingly.
+
 ## How the API key stays secret
 
 The browser never talks to Groq directly. It calls `/api/groq` on the same site, and a small server-side proxy ([`api/_groq-core.js`](api/_groq-core.js)) adds the key and forwards the request. The proxy only accepts same-site requests, allow-listed models, capped prompt/response sizes, and ~20 requests per minute per visitor. Locally, `npm run dev` serves the same proxy through Vite.
@@ -55,7 +76,8 @@ The browser never talks to Groq directly. It calls `/api/groq` on the same site,
 
 - **Frontend:** React 18, Vite, Tailwind CSS
 - **UI:** Radix UI / shadcn/ui, Framer Motion, Lucide icons
-- **AI:** Groq (OpenAI-compatible chat completions)
+- **AI:** Groq (OpenAI-compatible chat completions) with a retrieval-augmented (RAG) pipeline
+- **Knowledge sources:** Wikipedia (geosearch + page summaries), OpenStreetMap Nominatim
 - **Maps:** Leaflet + OpenStreetMap tiles, Nominatim geocoding
 - **Weather:** Open-Meteo (forecast + historical archive, no key required)
 - **Storage:** Browser localStorage
@@ -76,6 +98,7 @@ src/
 │   ├── trip/       # Day cards, maps, weather, rearrange board, packing
 │   └── ui/         # shadcn/ui primitives
 ├── lib/            # Itinerary AI logic, weather, geocoding, city data
+│   └── rag/        # RAG pipeline: retrieval, BM25 ranking, grounding
 ├── pages/          # Route pages
 └── utils/          # Helpers
 ```

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Sun, Cloud, Moon, MapPin, Clock, Lightbulb, Shuffle, StickyNote, Undo2, CloudRain, Loader2, Sparkles, Check, X, Map as MapIcon,
+  Sun, Cloud, Moon, MapPin, Clock, Lightbulb, Shuffle, StickyNote, Undo2, CloudRain, Loader2, Sparkles, Check, X, Map as MapIcon, BadgeCheck,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { EASE } from "@/components/motion/primitives";
@@ -177,6 +177,22 @@ function ActivityBlock({ period, data, isLast, wx, swapping, swapError, canUndo,
               {data.duration && (
                 <span className="chip">
                   <Clock className="h-3 w-3" /> {data.duration}
+                </span>
+              )}
+              {data.verified && data.place && (
+                <a
+                  href={data.place.wikipedia_url || data.place.osm_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`Matched to "${data.place.name}" (${data.place.type}) from ${data.place.source === "wikipedia" ? "Wikipedia" : "OpenStreetMap"}`}
+                  className="chip border-ocean/25 bg-ocean/10 font-semibold text-ocean transition hover:bg-ocean hover:text-white"
+                >
+                  <BadgeCheck className="h-3 w-3" /> Verified place
+                </a>
+              )}
+              {data.verified === false && (
+                <span className="chip text-ink/50" title="This stop couldn't be matched to a retrieved real place — double-check it.">
+                  AI suggestion · unverified
                 </span>
               )}
               {data.estimated_cost > 0 && (
