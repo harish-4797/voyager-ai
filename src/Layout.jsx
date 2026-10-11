@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { voyager } from "@/api/voyagerClient";
-import { Plane, Menu, X, Map, Compass, Plus, Settings, LogOut, ArrowUp, ArrowUpRight } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
+import { Plane, Menu, X, Map, Compass, Plus, Settings, LogOut, ArrowUp, ArrowUpRight, LogIn, Luggage } from "lucide-react";
 import {
   AnimatePresence,
   MotionConfig,
@@ -31,16 +31,18 @@ const FULL_BLEED_PAGES = ["Home", "TripView"];
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
-  const [user, setUser] = useState(null);
+  const { user, isCloud, isAuthenticated, signOut } = useAuth();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [showTop, setShowTop] = useState(false);
   const { scrollY } = useScroll();
 
-  useEffect(() => {
-    voyager.auth.me().then(setUser).catch(() => { });
-  }, []);
+  const handleSignOut = async () => {
+    await signOut();
+    navigate(createPageUrl("Home"));
+  };
 
   // Start every navigation at the top of the page.
   useEffect(() => {
@@ -138,7 +140,16 @@ export default function Layout({ children, currentPageName }) {
                 </Link>
               </Magnetic>
 
-              {user && (
+              {isCloud && !isAuthenticated && (
+                <Link
+                  to={`${createPageUrl("Login")}?next=${encodeURIComponent(location.pathname + location.search)}`}
+                  className={`hidden items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold transition sm:flex ${isTransparent ? "text-white hover:bg-white/15" : "text-ink hover:bg-ink/5"}`}
+                >
+                  <LogIn className="h-4 w-4" /> Sign in
+                </Link>
+              )}
+
+              {user && isAuthenticated && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sun/40 to-coral/40 text-sm font-semibold text-ink ring-2 ring-white/60 transition-all hover:ring-sunset/50">
@@ -154,14 +165,24 @@ export default function Layout({ children, currentPageName }) {
                     <DropdownMenuItem asChild className="rounded-xl">
                       <Link to={createPageUrl("UserPreferences")} className="flex cursor-pointer items-center">
                         <Settings className="mr-2 h-4 w-4" />
-                        Travel Preferences
+                        Profile & preferences
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="rounded-xl" onClick={() => voyager.auth.logout()}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Sign out
+                    <DropdownMenuItem asChild className="rounded-xl">
+                      <Link to={createPageUrl("MyTrips")} className="flex cursor-pointer items-center">
+                        <Luggage className="mr-2 h-4 w-4" />
+                        My trips
+                      </Link>
                     </DropdownMenuItem>
+                    {isCloud && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="rounded-xl" onClick={handleSignOut}>
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Sign out
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -204,7 +225,12 @@ export default function Layout({ children, currentPageName }) {
                 animate="show"
                 variants={{ show: { transition: { staggerChildren: 0.07, delayChildren: 0.2 } } }}
               >
-                {[...NAV_ITEMS, { name: "Plan a Trip", page: "PlanTrip", icon: Plus }].map((item) => (
+                {[
+                  ...NAV_ITEMS,
+                  { name: "Plan a Trip", page: "PlanTrip", icon: Plus },
+                  ...(isCloud && !isAuthenticated ? [{ name: "Sign in", page: "Login", icon: LogIn }] : []),
+                  ...(isAuthenticated && user ? [{ name: "Profile", page: "UserPreferences", icon: Settings }] : []),
+                ].map((item) => (
                   <motion.li
                     key={item.page}
                     variants={{ hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } } }}
@@ -220,7 +246,20 @@ export default function Layout({ children, currentPageName }) {
                   </motion.li>
                 ))}
               </motion.ul>
-              <p className="relative text-sm text-white/40">AI-powered travel planning · Made for explorers</p>
+              <div className="relative space-y-4">
+                {isCloud && isAuthenticated && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleSignOut();
+                    }}
+                    className="flex items-center gap-2 text-base font-semibold text-white/80"
+                  >
+                    <LogOut className="h-5 w-5" /> Sign out
+                  </button>
+                )}
+                <p className="text-sm text-white/40">AI-powered travel planning · Made for explorers</p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

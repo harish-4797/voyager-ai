@@ -18,6 +18,7 @@ import { MONTHS, getCityImage } from "@/lib/cities";
 import { generateItinerary, isOutdoor, PERIODS, suggestReplacement, withActivity } from "@/lib/itinerary";
 import { getTripWeather, parseISODate } from "@/lib/weather";
 import RearrangeBoard from "@/components/trip/RearrangeBoard";
+import { warmupEmbeddings } from "@/lib/rag/embeddings";
 import WeatherBadge from "@/components/trip/WeatherBadge";
 
 const STATUS_COLORS = {
@@ -29,6 +30,7 @@ const STATUS_COLORS = {
 
 const STAGE_LABELS = {
   retrieve: "Retrieving places…",
+  embed: "Embedding places…",
   rank: "Ranking places…",
   enrich: "Reading Wikipedia…",
   weather: "Checking weather…",
@@ -96,6 +98,9 @@ function RagProvenance({ rag }) {
         </span>
         <span className="chip">
           <MapPin className="h-3 w-3 text-ocean" /> {rag.retrieved} real places retrieved
+        </span>
+        <span className="chip" title={rag.retrieval === "hybrid" ? "Ranked with BM25 keywords + all-MiniLM-L6-v2 sentence embeddings" : "Ranked with BM25 keyword relevance"}>
+          <Sparkles className="h-3 w-3 text-ocean" /> {rag.retrieval === "hybrid" ? "Hybrid search (BM25 + vectors)" : "BM25 search"}
         </span>
         <span className="chip">
           <BadgeCheck className="h-3 w-3 text-ocean" /> {rag.grounded}/{rag.total} stops verified
@@ -290,6 +295,12 @@ export default function TripView() {
       cancelled = true;
     };
   }, [weatherKey]);
+
+  // Pre-load the embedding model so AI swaps can use hybrid search without waiting.
+  useEffect(() => {
+    const t = setTimeout(warmupEmbeddings, 2500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!lastSwap) return;

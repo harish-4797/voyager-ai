@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { voyager } from "@/api/voyagerClient";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Plus, MapPin, Calendar, Wallet, Plane, Trash2, ArrowUpRight } from "lucide-react";
+import { Plus, MapPin, Calendar, Wallet, Plane, Trash2, ArrowUpRight, UploadCloud, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
 import { AnimatePresence, motion } from "framer-motion";
 import PageHeader from "@/components/common/PageHeader";
 import { CountUp, EASE, Magnetic } from "@/components/motion/primitives";
@@ -30,8 +31,13 @@ function SkeletonCard() {
 }
 
 export default function MyTrips() {
+  const { isCloud, user } = useAuth();
+  const [localCount, setLocalCount] = useState(() => (isCloud ? voyager.local.count() : 0));
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState(null);
+
   const { data: trips = [], isLoading, refetch } = useQuery({
-    queryKey: ["my-trips"],
+    queryKey: ["my-trips", user?.id],
     queryFn: () => voyager.entities.Trip.list("-created_date", 50),
   });
 
@@ -40,6 +46,20 @@ export default function MyTrips() {
     e.stopPropagation();
     await voyager.entities.Trip.delete(id);
     refetch();
+  };
+
+  const importLocalTrips = async () => {
+    setImporting(true);
+    setImportError(null);
+    try {
+      await voyager.local.importToCloud();
+      setLocalCount(0);
+      refetch();
+    } catch (err) {
+      setImportError(err.message || "Import failed. Please try again.");
+    } finally {
+      setImporting(false);
+    }
   };
 
   const totalDays = trips.reduce((sum, t) => sum + (t.days || 0), 0);
@@ -64,6 +84,44 @@ export default function MyTrips() {
             </Link>
           </Magnetic>
         </PageHeader>
+
+        {localCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 flex flex-col gap-4 rounded-3xl border border-ocean/20 bg-ocean/5 p-5 sm:flex-row sm:items-center"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ocean text-white">
+              <UploadCloud className="h-5 w-5" />
+            </span>
+            <div className="flex-1">
+              <p className="font-semibold text-ink">
+                {localCount} trip{localCount > 1 ? "s" : ""} saved in this browser
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {importError || "Import them into your account to keep them safe and see them on every device."}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  voyager.local.dismiss();
+                  setLocalCount(0);
+                }}
+                className="rounded-full px-4 py-2.5 text-sm font-semibold text-ink/60 hover:bg-ink/5"
+              >
+                Discard
+              </button>
+              <button
+                onClick={importLocalTrips}
+                disabled={importing}
+                className="flex items-center gap-2 rounded-full bg-ocean px-5 py-2.5 text-sm font-semibold text-white hover:bg-ink disabled:opacity-60"
+              >
+                {importing && <Loader2 className="h-4 w-4 animate-spin" />} Import
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {!isLoading && trips.length > 0 && (
           <motion.div

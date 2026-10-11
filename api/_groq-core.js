@@ -27,6 +27,23 @@ function rateLimited(ip) {
 const fail = (status, message) => ({ status, json: { error: { message } } });
 
 /**
+ * When Supabase is configured, only signed-in users may use the AI. Verifies the
+ * "Authorization: Bearer <access token>" header with Supabase Auth.
+ * Returns null if allowed, or a failure response.
+ */
+export async function requireUser(authorization, supabaseUrl, supabaseKey) {
+  if (!supabaseUrl || !supabaseKey) return null; // local mode: no accounts to check
+  const token = /^Bearer\s+(.+)$/i.exec(authorization || "")?.[1];
+  if (!token) return fail(401, "Please sign in to use the AI planner.");
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, { headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` } });
+    return res.ok ? null : fail(401, "Your session has expired. Please sign in again.");
+  } catch {
+    return fail(503, "Couldn't verify your sign-in. Please try again.");
+  }
+}
+
+/**
  * @returns {Promise<{status: number, json: object}>}
  */
 export async function proxyGroq({ method, body, apiKey, ip, origin, host, extraModels = [] }) {

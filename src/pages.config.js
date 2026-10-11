@@ -49,6 +49,7 @@
  */
 import ExploreCities from './pages/ExploreCities';
 import Home from './pages/Home';
+import Login from './pages/Login';
 import MyTrips from './pages/MyTrips';
 import PlanTrip from './pages/PlanTrip';
 import TripView from './pages/TripView';
@@ -59,6 +60,7 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "ExploreCities": ExploreCities,
     "Home": Home,
+    "Login": Login,
     "MyTrips": MyTrips,
     "PlanTrip": PlanTrip,
     "TripView": TripView,

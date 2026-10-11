@@ -6,11 +6,24 @@ import { CITIES } from "@/lib/cities";
 import { getCityCoords, getTripWeather, parseISODate } from "@/lib/weather";
 import { categoriesFor, enrichWithWikipedia, fetchPlaces } from "@/lib/rag/places";
 import { rankPlaces, selectContext } from "@/lib/rag/ranking";
+import { isEmbeddingModelReady, semanticScores, withTimeout } from "@/lib/rag/embeddings";
 
 export { groundActivity, groundItinerary } from "@/lib/rag/grounding";
 
 /** Pipeline stages reported to the UI via `onStage(stage, info)`. */
-export const RAG_STAGES = ["retrieve", "rank", "enrich", "weather", "generate", "ground"];
+export const RAG_STAGES = ["retrieve", "embed", "rank", "enrich", "weather", "generate", "ground"];
+
+const EMBED_TIMEOUT_MS = 25000;
+
+/** Natural-language query used for dense retrieval. */
+function semanticQuery({ city, interests, prefs, hint, period }) {
+  const parts = [`Places to visit in ${city}`];
+  if (interests.length) parts.push(`for someone who loves ${interests.join(", ")}`);
+  if (prefs?.travel_style?.length) parts.push(`travel style: ${prefs.travel_style.join(", ")}`);
+  if (hint) parts.push(hint);
+  if (period) parts.push(`in the ${period}`);
+  return parts.join(". ");
+}
 
 export async function cityAreaFor(cityName) {
   const city = CITIES.find((c) => c.name === cityName);
@@ -54,8 +67,18 @@ export async function retrieveContext({
   const { docs, sources } = await fetchPlaces(area, categories);
   if (!docs.length) throw new Error("No places retrieved");
 
-  onStage?.("rank", { count: docs.length });
-  const ranked = rankPlaces(docs, { interests, prefs, hint, period, categories, near, exclude });
+  // Dense retrieval: embed the query + places and score by cosine similarity. If the model
+  // can't load in time, fall back to BM25-only ranking rather than blocking generation.
+  onStage?.("embed", { count: docs.length, firstTime: !isEmbeddingModelReady() });
+  let semantic = null;
+  try {
+    semantic = await withTimeout(semanticScores(docs, semanticQuery({ city, interests, prefs, hint, period })), EMBED_TIMEOUT_MS, "Embedding");
+  } catch (err) {
+    console.warn("Vector search unavailable — ranking with BM25 only:", err.message);
+  }
+
+  onStage?.("rank", { count: docs.length, hybrid: Boolean(semantic) });
+  const ranked = rankPlaces(docs, { interests, prefs, hint, period, categories, near, exclude, semantic });
   // Full itineraries get a balanced mix across interests; swaps rank purely for the hint/slot/proximity.
   const balanced = !hint && !near;
   const places = selectContext(ranked, { k, categories: balanced ? categories : null }).map((p, i) => ({
@@ -78,7 +101,7 @@ export async function retrieveContext({
     places,
     byId: Object.fromEntries(places.map((p) => [p.ref, p])),
     weather,
-    stats: { retrieved: docs.length, selected: places.length, sources },
+    stats: { retrieved: docs.length, selected: places.length, sources, retrieval: semantic ? "hybrid" : "bm25" },
   };
 }
 

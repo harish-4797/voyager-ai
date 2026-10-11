@@ -16,10 +16,12 @@ function groqApiProxy(env) {
     } catch {
       /* invalid JSON → proxy returns 400 */
     }
-    const { proxyGroq } = await import('./api/_groq-core.js')
+    const { proxyGroq, requireUser } = await import('./api/_groq-core.js')
     let result
     try {
-      result = await proxyGroq({
+      result =
+        (await requireUser(req.headers.authorization, env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)) ||
+        (await proxyGroq({
         method: req.method,
         body,
         apiKey: env.GROQ_API_KEY,
@@ -27,7 +29,7 @@ function groqApiProxy(env) {
         origin: req.headers.origin,
         host: req.headers.host,
         extraModels: [env.GROQ_MODEL, env.VITE_GROQ_MODEL],
-      })
+      }))
     } catch (err) {
       result = { status: 502, json: { error: { message: `Could not reach Groq: ${err.message}` } } }
     }

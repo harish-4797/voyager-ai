@@ -120,20 +120,33 @@ const norm = (s) => tokenize(s).join(" ");
  * @param {Set<string>|string[]} [opts.categories] categories the traveller asked for
  * @param {{lat:number,lng:number}} [opts.near] boost places near this point (swaps)
  * @param {string[]} [opts.exclude] place ids or names already used in the trip
+ * @param {Map<string, number>} [opts.semantic] doc.id → cosine similarity to the query (dense retrieval)
+ * @param {number} [opts.alpha] weight of BM25 vs. semantic in the hybrid score (1 = BM25 only)
  */
-export function rankPlaces(docs, { interests = [], prefs = null, hint = "", period = null, categories = [], near = null, exclude = [] } = {}) {
+export function rankPlaces(
+  docs,
+  { interests = [], prefs = null, hint = "", period = null, categories = [], near = null, exclude = [], semantic = null, alpha = 0.5 } = {}
+) {
   const wanted = new Set(categories);
   const excluded = new Set(exclude.map((e) => (e.includes("/") ? e : norm(e))));
   const pool = docs.filter((d) => !excluded.has(d.id) && !excluded.has(norm(d.name)));
   const query = buildQueryTerms({ interests, prefs, hint, period });
   const lexical = bm25(pool, query);
   const maxLex = Math.max(...lexical, 1e-9);
+  // Dense scores min-max normalised over the pool so they're on the same 0–1 scale as BM25.
+  const dense = semantic ? pool.map((d) => semantic.get(d.id) ?? 0) : null;
+  const dMin = dense ? Math.min(...dense) : 0;
+  const dRange = dense ? Math.max(...dense) - dMin || 1 : 1;
+  const w = dense ? alpha : 1;
   const avoidTerms = new Set(tokenize((prefs?.avoided_activities || []).join(" ")));
   const asked = new Set(hintCategories(hint));
 
   return pool
     .map((d, i) => {
-      const relevance = (lexical[i] / maxLex) * 3;
+      const lexicalN = lexical[i] / maxLex;
+      const semanticN = dense ? (dense[i] - dMin) / dRange : 0;
+      // Hybrid search: weighted fusion of sparse (BM25) and dense (embedding) relevance.
+      const relevance = (w * lexicalN + (1 - w) * semanticN) * 3;
       const notability =
         (d.source === "wikipedia" ? 1.5 : 0) + (d.wikidata ? 0.8 : 0) + Math.min(d.importance || 0, 1) * 1.5 + (d.description ? 0.2 : 0);
       const interest = wanted.has(d.category) ? (d.category === "sights" || d.category === "food" ? 0.6 : 1.2) : 0;
@@ -142,7 +155,7 @@ export function rankPlaces(docs, { interests = [], prefs = null, hint = "", peri
       const proximity = near ? 2.5 * Math.exp(-km(near, d) / 6) : 0;
       const avoid = tokenize(docText(d)).some((t) => avoidTerms.has(t)) ? -2 : 0;
       const score = relevance + notability + interest + timeFit + hintFit + proximity + avoid;
-      return { ...d, score, why: { relevance, notability, interest, timeFit, hintFit, proximity, avoid } };
+      return { ...d, score, why: { relevance, lexical: lexicalN, semantic: dense ? dense[i] : null, notability, interest, timeFit, hintFit, proximity, avoid } };
     })
     .sort((a, b) => b.score - a.score);
 }

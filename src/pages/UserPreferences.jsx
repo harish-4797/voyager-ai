@@ -2,7 +2,10 @@ import React, { useState, useEffect } from "react";
 import { voyager } from "@/api/voyagerClient";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Plus, Trash2, User, Utensils, Globe, Plane, MapPin, Check, X } from "lucide-react";
+import { Loader2, Save, Plus, Trash2, User, Utensils, Globe, Plane, MapPin, Check, X, LogOut, Mail, BadgeCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
+import { createPageUrl } from "@/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import PageHeader from "@/components/common/PageHeader";
 import { BrandLoader } from "@/components/common/Brand";
@@ -13,10 +16,14 @@ const DIETARY_OPTIONS = ["vegetarian", "vegan", "gluten-free", "halal", "kosher"
 const BUDGET_RANGES = ["backpacker", "budget", "mid-range", "luxury", "ultra-luxury"];
 
 export default function UserPreferences() {
+  const { isCloud, signOut, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [prefs, setPrefs] = useState({
+    full_name: "",
     travel_style: [],
     dietary_restrictions: [],
     preferred_budget_range: "mid-range",
@@ -31,6 +38,7 @@ export default function UserPreferences() {
     voyager.auth.me().then((u) => {
       setUser(u);
       setPrefs({
+        full_name: u.full_name || "",
         travel_style: u.travel_style || [],
         dietary_restrictions: u.dietary_restrictions || [],
         preferred_budget_range: u.preferred_budget_range || "mid-range",
@@ -77,10 +85,22 @@ export default function UserPreferences() {
 
   const handleSave = async () => {
     setSaving(true);
-    await voyager.auth.updateMe(prefs);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setSaveError(null);
+    try {
+      await voyager.auth.updateMe({ ...prefs, full_name: prefs.full_name.trim() });
+      await refreshUser(); // keep the nav bar's name in sync
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setSaveError(err.message || "Couldn't save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate(createPageUrl("Home"));
   };
 
   if (!user) return <BrandLoader label="Loading preferences" />;
@@ -96,10 +116,43 @@ export default function UserPreferences() {
       <div className="mx-auto max-w-3xl">
         <PageHeader
           eyebrow="Profile"
-          title="Travel"
-          accent="preferences"
-          subtitle="Teach the AI how you like to travel — every itinerary gets more personal."
+          title="Your"
+          accent="profile"
+          subtitle="Your account and travel preferences — every itinerary gets more personal."
         />
+
+        <Reveal className="surface mb-5 p-6 sm:p-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-sun/50 to-coral/50 font-display text-2xl font-bold text-ink">
+              {(prefs.full_name || user.email || "U")[0].toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your name</label>
+              <Input
+                value={prefs.full_name}
+                onChange={(e) => setPrefs({ ...prefs, full_name: e.target.value })}
+                placeholder="How should we greet you?"
+                maxLength={60}
+                className="h-11 rounded-2xl bg-white/80 text-base font-semibold"
+              />
+              {isCloud && (
+                <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> {user.email}</span>
+                  <span className="flex items-center gap-1 text-emerald-700"><BadgeCheck className="h-3.5 w-3.5" /> Trips synced to your account</span>
+                  {user.created_at && <span>Member since {new Date(user.created_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</span>}
+                </p>
+              )}
+            </div>
+            {isCloud && (
+              <button
+                onClick={handleSignOut}
+                className="flex shrink-0 items-center gap-2 self-start rounded-full border border-ink/10 px-4 py-2.5 text-sm font-semibold text-ink/70 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 sm:self-center"
+              >
+                <LogOut className="h-4 w-4" /> Sign out
+              </button>
+            )}
+          </div>
+        </Reveal>
 
         <div className="space-y-5">
           <Section index={1} icon={Globe} title="Travel style" hint="Pick everything that sounds like you">
@@ -257,8 +310,8 @@ export default function UserPreferences() {
         className="fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
       >
         <div className="flex w-full max-w-md items-center justify-between gap-3 rounded-full border border-ink/[0.07] bg-white/85 p-2 pl-6 shadow-lift backdrop-blur-xl">
-          <span className="text-sm text-muted-foreground">
-            {saved ? "All changes saved" : "Save to personalise trips"}
+          <span className={`text-sm ${saveError ? "text-red-600" : "text-muted-foreground"}`}>
+            {saveError ? saveError : saved ? "All changes saved" : "Save to personalise trips"}
           </span>
           <motion.button
             whileTap={{ scale: 0.95 }}

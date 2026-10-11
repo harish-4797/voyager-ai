@@ -11,6 +11,11 @@ import BudgetSlider from "@/components/planner/BudgetSlider";
 import PageHeader from "@/components/common/PageHeader";
 import { AnimatedNumber, EASE, Magnetic } from "@/components/motion/primitives";
 import { generateItinerary as requestItinerary } from "@/lib/itinerary";
+import { warmupEmbeddings } from "@/lib/rag/embeddings";
+import { useAuth } from "@/lib/AuthContext";
+
+// Lets a signed-out visitor finish the planner, sign in, and come back with choices intact.
+const PENDING_PLAN_KEY = "voyager_pending_plan";
 import { CITIES, bestSeasonMonths } from "@/lib/cities";
 import { parseISODate, toISODate } from "@/lib/weather";
 import SurpriseMe from "@/components/planner/SurpriseMe";
@@ -27,6 +32,8 @@ const STEPS = [
 
 export default function PlanTrip() {
   const navigate = useNavigate();
+  const { isCloud, isAuthenticated } = useAuth();
+  const needsLogin = isCloud && !isAuthenticated;
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [surpriseOpen, setSurpriseOpen] = useState(false);
@@ -46,7 +53,22 @@ export default function PlanTrip() {
     const params = new URLSearchParams(window.location.search);
     const city = params.get("city");
     if (params.get("surprise")) setSurpriseOpen(true);
+    if (params.get("resume")) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(PENDING_PLAN_KEY));
+        if (saved?.city) {
+          setForm((f) => ({ ...f, ...saved }));
+          setStep(3);
+        }
+      } catch {
+        /* nothing to resume */
+      }
+      sessionStorage.removeItem(PENDING_PLAN_KEY);
+    }
     if (city) setForm((f) => ({ ...f, city }));
+    // Start downloading the embedding model in the background so it's ready by "Generate".
+    const warm = setTimeout(warmupEmbeddings, 1500);
+    return () => clearTimeout(warm);
   }, []);
 
   const canProceed = () => {
@@ -58,6 +80,11 @@ export default function PlanTrip() {
   };
 
   const generateItinerary = async () => {
+    if (needsLogin) {
+      sessionStorage.setItem(PENDING_PLAN_KEY, JSON.stringify(form));
+      navigate(`${createPageUrl("Login")}?next=${encodeURIComponent(`${createPageUrl("PlanTrip")}?resume=1`)}`);
+      return;
+    }
     setLoading(true);
     setError(null);
     setGenStage(null);
@@ -395,7 +422,7 @@ export default function PlanTrip() {
                 className="btn-sunset flex items-center gap-2 rounded-full px-8 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {loading ? "Generating your trip..." : "Generate itinerary"}
+                {loading ? "Generating your trip..." : needsLogin ? "Sign in to generate" : "Generate itinerary"}
               </motion.button>
             </Magnetic>
           )}
@@ -415,7 +442,16 @@ const STEP_COPY = [
 // Real RAG pipeline stages, reported by generateItinerary's onStage callback.
 const PIPELINE = [
   { key: "retrieve", short: "Retrieve", text: (f) => `Retrieving real places in ${f.city} from Wikipedia & OpenStreetMap…` },
-  { key: "rank", short: "Rank", text: (f, i) => `Ranking ${i?.count ?? ""} places for ${f.interests.slice(0, 2).join(" & ") || "you"}…` },
+  {
+    key: "embed",
+    short: "Embed",
+    text: (f, i) => (i?.firstTime ? "Loading the embedding model (first time only)…" : `Embedding ${i?.count ?? ""} places for semantic search…`),
+  },
+  {
+    key: "rank",
+    short: "Rank",
+    text: (f, i) => `${i?.hybrid ? "Hybrid-ranking" : "Ranking"} ${i?.count ?? ""} places for ${f.interests.slice(0, 2).join(" & ") || "you"}…`,
+  },
   { key: "enrich", short: "Enrich", text: () => "Reading Wikipedia notes on the top picks…" },
   { key: "weather", short: "Weather", text: (f) => `Checking ${f.month} weather for your dates…` },
   { key: "generate", short: "Generate", text: () => "Writing your day-by-day plan with AI…" },

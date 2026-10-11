@@ -42,6 +42,8 @@ export function fuzzyMatch(activity, places) {
 
 const MEAL = /\b(breakfast|brunch|lunch|dinner|supper|meal|thali|eat|eating|dine|dining|restaurant|food tour|street food)\b/i;
 const EATERIES = new Set(["food", "nightlife"]);
+// Travel logistics aren't visits to the cited place ("Hotel check-in" near a church).
+const LOGISTICS = /\b(check-?in|check-?out|checkin|checkout|hotel|airport|arrival|arrive|departure|depart|transfer|travel to|drive to)\b/i;
 
 /** Grounds one activity against the retrieval context `{ places, byId }`. */
 export function groundActivity(activity, ctx) {
@@ -56,7 +58,8 @@ export function groundActivity(activity, ctx) {
   if (!place) return { ...rest, verified: false };
   // A meal "near" a church is not the church: keep the location for the map, but don't claim
   // the eatery itself was verified.
-  if (MEAL.test(rest.activity || "") && !EATERIES.has(place.category) && place.kind !== "market") {
+  const isMealElsewhere = MEAL.test(rest.activity || "") && !EATERIES.has(place.category) && place.kind !== "market";
+  if (isMealElsewhere || LOGISTICS.test(rest.activity || "")) {
     return { ...rest, lat: place.lat, lng: place.lng, verified: false, near: { name: place.name, type: place.label } };
   }
   return {
@@ -105,6 +108,7 @@ export function groundItinerary(itinerary, ctx) {
       retrieved: ctx.stats.retrieved,
       context: ctx.places.length,
       knowledge: ctx.stats.sources,
+      retrieval: ctx.stats.retrieval || "bm25",
       grounded,
       total,
       weather: ctx.weather ? (ctx.weather.days.some((d) => d.source === "forecast") ? "forecast" : "typical") : null,

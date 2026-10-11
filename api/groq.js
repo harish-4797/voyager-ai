@@ -1,4 +1,4 @@
-import { proxyGroq } from "./_groq-core.js";
+import { proxyGroq, requireUser } from "./_groq-core.js";
 
 // Itinerary generation can take a while on long trips.
 export const config = { maxDuration: 60 };
@@ -6,6 +6,8 @@ export const config = { maxDuration: 60 };
 /** Vercel serverless function: POST /api/groq */
 export default async function handler(req, res) {
   try {
+    const denied = await requireUser(req.headers.authorization, process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+    if (denied) return res.status(denied.status).json(denied.json);
     const result = await proxyGroq({
       method: req.method,
       body: req.body,

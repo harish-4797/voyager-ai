@@ -171,10 +171,12 @@ export function surpriseDestination({ monthIndex, budget, days, exclude = [] }) 
   const perDay = budget / Math.max(1, days);
   const scored = CITIES.filter((c) => !exclude.includes(c.name)).map((city) => {
     const fit = seasonFit(city, monthIndex);
-    const seasonScore = fit === "peak" ? 4 : fit === "shoulder" ? 2 : 0;
+    // Season dominates (an off-season city can never beat an in-season one); budget and a
+    // little randomness only decide between cities in the same season band.
+    const seasonScore = fit === "peak" ? 6 : fit === "shoulder" ? 3 : 0;
     const ratio = perDay / city.avgBudget;
-    const budgetScore = ratio >= 1 ? 3 : ratio >= 0.75 ? 1.5 : 0;
-    return { city, fit, fitsBudget: ratio >= 0.75, score: seasonScore + budgetScore + Math.random() * 1.5 };
+    const budgetScore = ratio >= 1 ? 2 : ratio >= 0.75 ? 1 : 0;
+    return { city, fit, fitsBudget: ratio >= 0.75, score: seasonScore + budgetScore + Math.random() * 0.9 };
   });
   scored.sort((a, b) => b.score - a.score);
   return scored[0] || null;
