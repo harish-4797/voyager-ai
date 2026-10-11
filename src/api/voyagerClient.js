@@ -162,8 +162,9 @@ const AuthService = {
 // ========================
 
 
-// Groq API Integration
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+// Groq API Integration — calls go through our own /api/groq proxy so the API key
+// stays on the server (see api/_groq-core.js). Never put the key in a VITE_ variable.
+const AI_ENDPOINT = '/api/groq';
 const PREFERRED_MODEL = import.meta.env.VITE_GROQ_MODEL || 'openai/gpt-oss-120b';
 
 // Fallback models in case a model is deprecated, retired, or unavailable
@@ -208,17 +209,9 @@ function parseOrRepairJson(rawText) {
 
 const AIService = {
     /**
-     * Invoke Groq API for AI-powered itinerary generation.
+     * Invoke Groq (via the server-side proxy) for AI-powered itinerary generation.
      */
     async InvokeLLM({ prompt, response_json_schema }) {
-        if (!GROQ_API_KEY) {
-            throw new Error(
-                'VITE_GROQ_API_KEY is not set. Please create a .env file with your Groq API key.\n' +
-                'Get one at: https://console.groq.com/keys'
-            );
-        }
-
-        const url = 'https://api.groq.com/openai/v1/chat/completions';
         const systemInstruction = 'You are an expert travel assistant. Always respond with valid JSON only, no markdown formatting, no code fences, no extra text.';
 
         let lastError = null;
@@ -230,12 +223,9 @@ const AIService = {
 
             for (const format of formatOptions) {
                 try {
-                    const response = await fetch(url, {
+                    const response = await fetch(AI_ENDPOINT, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${GROQ_API_KEY}`,
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             model,
                             messages: [

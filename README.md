@@ -28,10 +28,11 @@ An AI-powered travel planner built with React + Vite. Tell it where, when and wh
 
 2. **Create a `.env` file** in the project root (copy `.env.example`):
    ```env
-   VITE_GROQ_API_KEY=your-groq-api-key-here
+   GROQ_API_KEY=your-groq-api-key-here
    # Optional, defaults to openai/gpt-oss-120b
    VITE_GROQ_MODEL=openai/gpt-oss-120b
    ```
+   `GROQ_API_KEY` is deliberately **not** prefixed with `VITE_`, so it's never bundled into the browser code.
 
 3. **Start the dev server**
    ```bash
@@ -39,7 +40,16 @@ An AI-powered travel planner built with React + Vite. Tell it where, when and wh
    ```
    Then open `http://localhost:5173`.
 
-> ⚠️ **Don't deploy this publicly as-is.** Vite embeds every `VITE_` variable into the browser bundle, so anyone visiting a deployed site could read your Groq key. For a public deployment, move the Groq call into a server-side function (e.g. a Vercel/Netlify/Cloudflare function) that keeps the key secret.
+## How the API key stays secret
+
+The browser never talks to Groq directly. It calls `/api/groq` on the same site, and a small server-side proxy ([`api/_groq-core.js`](api/_groq-core.js)) adds the key and forwards the request. The proxy only accepts same-site requests, allow-listed models, capped prompt/response sizes, and ~20 requests per minute per visitor. Locally, `npm run dev` serves the same proxy through Vite.
+
+## Deploy to Vercel
+
+1. Push this repo to GitHub.
+2. On [vercel.com/new](https://vercel.com/new), import the repository. Vercel detects Vite automatically (settings are also in `vercel.json`).
+3. Under **Environment Variables**, add `GROQ_API_KEY` with your key (optionally `VITE_GROQ_MODEL`).
+4. Click **Deploy**. Every later `git push` to `main` redeploys automatically.
 
 ## Tech Stack
 
@@ -53,8 +63,11 @@ An AI-powered travel planner built with React + Vite. Tell it where, when and wh
 ## Project Structure
 
 ```
+api/
+├── groq.js         # Vercel serverless function: POST /api/groq
+└── _groq-core.js   # Shared proxy logic (also used by the Vite dev server)
 src/
-├── api/            # voyagerClient — localStorage storage + Groq API
+├── api/            # voyagerClient — localStorage storage + calls to /api/groq
 ├── components/
 │   ├── common/     # Brand, page header
 │   ├── home/       # Landing page sections & scroll animations
